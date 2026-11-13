@@ -38,16 +38,28 @@ namespace SignBridge.HandSize
         [SerializeField, Min(0f)]
         private float _gripSizeOverride = 0f;
 
-        [Tooltip("잡는 굵기의 최소값 = 손 길이 × 이 비율. 너무 작아서 못 집는 것을 방지.")]
+        [Tooltip("잡는 굵기의 최소값 = 손 길이 × 이 비율. 너무 작아서 못 집는 것을 방지. (Allow Grow가 켜져 있을 때만 적용)")]
         [SerializeField, Range(0.02f, 0.5f)]
         private float _minGripRatio = 0.08f;
 
-        [Tooltip("잡는 굵기의 최대값 = 손 길이 × 이 비율. 너무 커서 손에 안 들어오는 것을 방지.")]
+        [Tooltip("벌림 폭 데이터가 아직 쌓이지 않았을 때 쓰는 최대 굵기 = 손 길이 × 이 비율.")]
         [SerializeField, Range(0.05f, 1f)]
         private float _maxGripRatio = 0.4f;
 
+        [Tooltip("켜면, 쌓인 손 데이터의 최대 벌림 폭(엄지~검지/중지 끝)을 기준으로 최대 굵기를 정한다.")]
+        [SerializeField]
+        private bool _useMeasuredAperture = true;
+
+        [Tooltip("최대 굵기 = 측정된 최대 벌림 폭 × 이 비율. 1이면 손을 끝까지 벌려야 겨우 잡히는 크기.")]
+        [SerializeField, Range(0.3f, 1.2f)]
+        private float _apertureFitRatio = 0.8f;
+
         [Header("공통")]
-        [Tooltip("원래 크기 대비 배율의 최소/최대 한계.")]
+        [Tooltip("끄면 줄이기만 하고 원래 크기보다 키우지 않는다. 원래 크기에서 잘 잡히는 물체는 그대로 둔다.")]
+        [SerializeField]
+        private bool _allowGrow = false;
+
+        [Tooltip("원래 크기 대비 배율의 최소/최대 한계. (Allow Grow가 꺼져 있으면 최대는 1로 고정)")]
         [SerializeField]
         private Vector2 _multiplierLimits = new Vector2(0.5f, 2f);
 
@@ -118,12 +130,16 @@ namespace SignBridge.HandSize
                 case SizingMode.FitGripToHand:
                     if (_baseGripSize <= 0f) break;
                     float min = estimator.HandLength * _minGripRatio;
-                    float max = estimator.HandLength * Mathf.Max(_maxGripRatio, _minGripRatio);
+                    float max = _useMeasuredAperture && estimator.HasGripAperture
+                        ? estimator.MaxGripAperture * _apertureFitRatio
+                        : estimator.HandLength * _maxGripRatio;
+                    max = Mathf.Max(max, min);
                     if (_baseGripSize < min) m = min / _baseGripSize;
                     else if (_baseGripSize > max) m = max / _baseGripSize;
                     break;
             }
-            return Mathf.Clamp(m, _multiplierLimits.x, _multiplierLimits.y);
+            float maxMultiplier = _allowGrow ? _multiplierLimits.y : Mathf.Min(1f, _multiplierLimits.y);
+            return Mathf.Clamp(m, Mathf.Min(_multiplierLimits.x, maxMultiplier), maxMultiplier);
         }
 
         private void Apply()

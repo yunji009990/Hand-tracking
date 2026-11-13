@@ -423,7 +423,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1017255c31113144698dfe9e1532e320, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.1467982
+      value: 0.159
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1017255c31113144698dfe9e1532e320, type: 3}
       propertyPath: m_LocalRotation.w
@@ -468,12 +468,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 1017255c31113144698dfe9e1532e320, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1194270468}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 1017255c31113144698dfe9e1532e320, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1194270467}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 1017255c31113144698dfe9e1532e320, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1194270466}
   m_SourcePrefab: {fileID: 100100000, guid: 1017255c31113144698dfe9e1532e320, type: 3}
 --- !u!1 &451472276
 GameObject:
@@ -813,6 +807,9 @@ MonoBehaviour:
   _gripSizeOverride: 0
   _minGripRatio: 0.08
   _maxGripRatio: 0.4
+  _useMeasuredAperture: 1
+  _apertureFitRatio: 0.8
+  _allowGrow: 0
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
@@ -915,6 +912,9 @@ MonoBehaviour:
   _gripSizeOverride: 0
   _minGripRatio: 0.08
   _maxGripRatio: 0.4
+  _useMeasuredAperture: 1
+  _apertureFitRatio: 0.8
+  _allowGrow: 0
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
@@ -1017,6 +1017,9 @@ MonoBehaviour:
   _gripSizeOverride: 0
   _minGripRatio: 0.08
   _maxGripRatio: 0.4
+  _useMeasuredAperture: 1
+  _apertureFitRatio: 0.8
+  _allowGrow: 0
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
@@ -1379,6 +1382,9 @@ MonoBehaviour:
   _gripSizeOverride: 0
   _minGripRatio: 0.08
   _maxGripRatio: 0.4
+  _useMeasuredAperture: 1
+  _apertureFitRatio: 0.8
+  _allowGrow: 0
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
@@ -1415,11 +1421,16 @@ MonoBehaviour:
   _hands: []
   _referenceHandLength: 0.185
   _validLengthRange: {x: 0.08, y: 0.25}
-  _sampleWindow: 60
+  _historySize: 900
   _minSamples: 20
+  _minApertureSamples: 120
+  _aperturePercentile: 0.95
+  _minApertureRatio: 0.45
+  _recomputeInterval: 0.25
   _changeThreshold: 0.03
-  _resetAfterLostSeconds: 3
+  _resetAfterLostSeconds: 10
   _editorSimulatedHandLength: 0
+  _editorSimulatedAperture: 0
   _logChanges: 1
 --- !u!4 &1172857689
 Transform:
@@ -1441,55 +1452,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 1017255c31113144698dfe9e1532e320, type: 3}
   m_PrefabInstance: {fileID: 400490395}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1194270466
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1194270465}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 43f86b14a27b52f4f9298c33015b5c26, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _transferOnSecondSelection: 0
-  _addNewPointsToFront: 0
-  _forwardElement: {fileID: 0}
-  _oneGrabTransformer: {fileID: 0}
-  _twoGrabTransformer: {fileID: 0}
-  _targetTransform: {fileID: 0}
-  _maxGrabPoints: -1
-  _rigidbody: {fileID: 1194270467}
-  _kinematicWhileSelected: 1
-  _throwWhenUnselected: 1
---- !u!54 &1194270467
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1194270465}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!65 &1194270468
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1609,6 +1571,9 @@ MonoBehaviour:
   _gripSizeOverride: 0
   _minGripRatio: 0.08
   _maxGripRatio: 0.4
+  _useMeasuredAperture: 1
+  _apertureFitRatio: 0.8
+  _allowGrow: 0
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
