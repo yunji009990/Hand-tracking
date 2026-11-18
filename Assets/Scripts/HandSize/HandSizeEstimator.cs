@@ -16,6 +16,9 @@ namespace SignBridge.HandSize
     ///   손을 크게 벌린 순간들이 쌓일수록 "이 손으로 감쌀 수 있는 최대 크기"에 가까워진다.
     ///
     /// 양손이 일정 시간 이상 사라지면(헤드셋을 벗고 다른 아동이 착용) 쌓인 데이터를 비우고 다시 쌓는다.
+    ///
+    /// 측정 전에는 5~7세 아동 평균(손 길이 약 13.8cm, Wen et al. 2020)을 초기 추정값으로 쓰고,
+    /// 데이터가 쌓이면 실제 측정값으로 바뀐다.
     /// </summary>
     [DefaultExecutionOrder(-100)]
     public class HandSizeEstimator : MonoBehaviour
@@ -31,9 +34,24 @@ namespace SignBridge.HandSize
         [SerializeField, Range(0.10f, 0.25f)]
         private float _referenceHandLength = 0.185f;
 
-        [Tooltip("이 범위를 벗어나는 손 길이 측정값은 트래킹 오류로 보고 버린다(m).")]
+        [Tooltip("이 범위를 벗어나는 손 길이 측정값은 트래킹 오류로 보고 버린다(m). " +
+                 "기본값은 5~7세 아동 평균 ±3 표준편차(약 11~17cm). 성인 손으로 테스트하려면 넓힐 것.")]
         [SerializeField]
-        private Vector2 _validLengthRange = new Vector2(0.08f, 0.25f);
+        private Vector2 _validLengthRange = new Vector2(0.11f, 0.17f);
+
+        [Header("아동 기준 (5~7세, 측정 전 초기 추정값)")]
+        [Tooltip("켜면 실제 데이터가 쌓이기 전에도 아동 평균 손 크기로 물체를 미리 맞춘다.")]
+        [SerializeField]
+        private bool _usePriorBeforeMeasurement = true;
+
+        [Tooltip("측정 전 초기 손 길이(m). 5.5~7.9세 남녀 평균 약 13.8cm " +
+                 "(Wen et al., 2020, J Int Med Res, 중국 아동 1,255명, 손목 주름~중지 끝).")]
+        [SerializeField, Range(0.10f, 0.20f)]
+        private float _priorHandLength = 0.138f;
+
+        [Tooltip("측정 전 초기 벌림 폭 = 초기 손 길이 × 이 비율.")]
+        [SerializeField, Range(0.3f, 1f)]
+        private float _priorApertureRatio = 0.7f;
 
         [Header("데이터 누적")]
         [Tooltip("손별로 보관할 최근 프레임 수. 60fps 기준 900 = 약 15초 분량. 많을수록 안정적이지만 변화에 느리게 반응한다.")]
@@ -106,14 +124,17 @@ namespace SignBridge.HandSize
         /// <summary>손바닥 너비(m, 검지~새끼 손가락 첫 마디). 측정 전에는 0.</summary>
         public float PalmWidth { get; private set; }
 
-        /// <summary>쌓인 데이터에서 구한 최대 벌림 폭(m, 엄지 끝 ~ 검지/중지 끝). HasGripAperture가 false면 0.</summary>
+        /// <summary>최대 벌림 폭(m, 엄지 끝 ~ 검지/중지 끝). 데이터가 부족하면 손 길이 × 아동 평균 비율로 추정. HasGripAperture가 false면 0.</summary>
         public float MaxGripAperture { get; private set; }
 
-        /// <summary>벌림 폭을 믿을 만큼 데이터가 쌓였는지.</summary>
+        /// <summary>쓸 수 있는 벌림 폭 값이 있는지(추정값 포함).</summary>
         public bool HasGripAperture { get; private set; }
 
-        /// <summary>손 길이 추정값이 한 번 이상 나왔는지.</summary>
+        /// <summary>쓸 수 있는 추정값이 있는지(아동 초기 추정값 포함).</summary>
         public bool IsCalibrated { get; private set; }
+
+        /// <summary>실제 손 데이터로 측정한 값인지. false면 아동 초기 추정값.</summary>
+        public bool IsMeasured { get; private set; }
 
         /// <summary>현재 사용자에 대해 쌓인 샘플 수(양손 합).</summary>
         public int SampleCount => _left.Count + _right.Count;
@@ -135,6 +156,13 @@ namespace SignBridge.HandSize
         private float _nextRecomputeTime;
         private bool _dirty;
         private float _lastSimulatedLength = -1f, _lastSimulatedAperture = -1f;
+        private bool _apertureMeasured;
+        private int _rejectedInRow;
+        private float _lastRejectedLength;
+        private float _nextRejectWarningTime;
+
+        private const int RejectWarningCount = 120;
+        private const float RejectWarningInterval = 10f;
 
         private void Awake()
         {
@@ -146,7 +174,21 @@ namespace SignBridge.HandSize
             }
             Instance = this;
             HandLength = _referenceHandLength;
+            ApplyPrior();
             ResolveHands();
+        }
+
+        /// <summary>아동 평균값을 측정 전 초기 추정값으로 설정한다.</summary>
+        private void ApplyPrior()
+        {
+            IsMeasured = false;
+            if (!_usePriorBeforeMeasurement)
+            {
+                IsCalibrated = false;
+                HasGripAperture = false;
+                return;
+            }
+            SetProfile(_priorHandLength, 0f, _priorHandLength * _priorApertureRatio, true, force: true);
         }
 
         private void OnDestroy()
@@ -230,7 +272,12 @@ namespace SignBridge.HandSize
                 }
                 _retryAt.Remove(hand);
 
-                if (sample.Length < _validLengthRange.x || sample.Length > _validLengthRange.y) continue;
+                if (sample.Length < _validLengthRange.x || sample.Length > _validLengthRange.y)
+                {
+                    WarnIfRejectedTooOften(sample.Length);
+                    continue;
+                }
+                _rejectedInRow = 0;
 
                 if (handedness == Handedness.Left) { leftDone = true; _left.Add(sample, _historySize); }
                 else { rightDone = true; _right.Add(sample, _historySize); }
@@ -248,6 +295,19 @@ namespace SignBridge.HandSize
                 ClearHistory();
                 if (_logChanges) Debug.Log("[HandSize] 손이 사라져 쌓인 데이터를 비웠습니다. 다시 측정합니다.", this);
             }
+        }
+
+        private void WarnIfRejectedTooOften(float length)
+        {
+            _rejectedInRow++;
+            _lastRejectedLength = length;
+            if (_rejectedInRow < RejectWarningCount || Time.unscaledTime < _nextRejectWarningTime) return;
+
+            _nextRejectWarningTime = Time.unscaledTime + RejectWarningInterval;
+            Debug.LogWarning(
+                $"[HandSize] 손 길이 {_lastRejectedLength * 100f:F1}cm가 허용 범위 " +
+                $"({_validLengthRange.x * 100f:F0}~{_validLengthRange.y * 100f:F0}cm)를 벗어나 계속 버려지고 있습니다. " +
+                "성인 손으로 테스트 중이라면 Valid Length Range를 넓히세요.", this);
         }
 
         private static bool TryMeasure(IHand hand, out Sample sample)
@@ -288,12 +348,22 @@ namespace SignBridge.HandSize
 
             float length = Percentile(s => s.Length, 0.5f);
             float palm = Percentile(s => s.PalmWidth, 0.5f);
-            bool hasAperture = count >= _minApertureSamples;
-            float aperture = hasAperture
-                ? Mathf.Max(Percentile(s => s.Aperture, _aperturePercentile), length * _minApertureRatio)
-                : 0f;
+            _apertureMeasured = count >= _minApertureSamples;
+            bool hasAperture = _apertureMeasured || _usePriorBeforeMeasurement;
+            float aperture = 0f;
+            if (_apertureMeasured)
+            {
+                aperture = Mathf.Max(Percentile(s => s.Aperture, _aperturePercentile), length * _minApertureRatio);
+            }
+            else if (_usePriorBeforeMeasurement)
+            {
+                // 벌림 폭 데이터가 모이기 전에는 측정된 손 길이에 아동 평균 비율을 곱해 추정한다.
+                aperture = length * _priorApertureRatio;
+            }
 
-            SetProfile(length, palm, aperture, hasAperture, force: !IsCalibrated);
+            bool first = !IsMeasured;
+            IsMeasured = true;
+            SetProfile(length, palm, aperture, hasAperture, force: first);
         }
 
         private float Percentile(Func<Sample, float> selector, float p)
@@ -322,8 +392,10 @@ namespace SignBridge.HandSize
 
             if (_logChanges && (lengthChanged || apertureChanged))
             {
-                string ap = HasGripAperture ? $"{MaxGripAperture * 100f:F1}cm" : "측정 중";
-                Debug.Log($"[HandSize] 손 길이 {HandLength * 100f:F1}cm (기준 대비 {HandScale:F2}배), " +
+                string source = IsMeasured ? "측정" : "아동 평균 초기값";
+                string ap = !HasGripAperture ? "측정 중"
+                    : $"{MaxGripAperture * 100f:F1}cm{(IsMeasured && !_apertureMeasured ? " (추정)" : "")}";
+                Debug.Log($"[HandSize] [{source}] 손 길이 {HandLength * 100f:F1}cm (기준 대비 {HandScale:F2}배), " +
                           $"손바닥 {PalmWidth * 100f:F1}cm, 최대 벌림 {ap}, 샘플 {SampleCount}", this);
             }
             if (lengthChanged) WhenHandScaleChanged(HandScale);
@@ -342,6 +414,8 @@ namespace SignBridge.HandSize
 
             _lastSimulatedLength = _editorSimulatedHandLength;
             _lastSimulatedAperture = aperture;
+            IsMeasured = true;
+            _apertureMeasured = true;
             SetProfile(_editorSimulatedHandLength, _editorSimulatedHandLength * 0.45f, aperture, true, force: true);
         }
 #endif
@@ -351,14 +425,15 @@ namespace SignBridge.HandSize
             _left.Clear();
             _right.Clear();
             _dirty = false;
+            _apertureMeasured = false;
         }
 
-        /// <summary>쌓인 데이터를 비우고 다시 측정한다(예: 다음 아동 차례 버튼).</summary>
+        /// <summary>쌓인 데이터를 비우고 아동 초기 추정값에서 다시 측정한다(예: 다음 아동 차례 버튼).</summary>
         public void Recalibrate()
         {
             ClearHistory();
-            IsCalibrated = false;
-            HasGripAperture = false;
+            _apertureMeasured = false;
+            ApplyPrior();
         }
 
         /// <summary>코드에서 Hand를 연결할 때 사용.</summary>

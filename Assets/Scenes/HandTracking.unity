@@ -1420,7 +1420,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _hands: []
   _referenceHandLength: 0.185
-  _validLengthRange: {x: 0.08, y: 0.25}
+  _validLengthRange: {x: 0.11, y: 0.17}
+  _usePriorBeforeMeasurement: 1
+  _priorHandLength: 0.138
+  _priorApertureRatio: 0.7
   _historySize: 900
   _minSamples: 20
   _minApertureSamples: 120
