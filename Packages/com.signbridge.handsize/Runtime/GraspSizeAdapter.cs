@@ -58,6 +58,12 @@ namespace SignBridge.HandSize
         [SerializeField, Range(1f, 3f)]
         private float _maxGrowMultiplier = 1.5f;
 
+        [Tooltip("가장 긴 축이 굵기의 이 배수 이상이면 막대형(채, 스틱, 연필 등)으로 보고 키우지 않는다. " +
+                 "막대는 손잡이를 감싸 쥐므로 얇아도 잘 잡히고, 키우면 길이가 너무 길어진다. 0이면 끈다. " +
+                 "두꺼워서 줄이는 것은 그대로 적용된다.")]
+        [SerializeField, Min(0f)]
+        private float _noGrowElongation = 3f;
+
         [Header("벌림 폭 상한 (보조)")]
         [Tooltip("켜면, 측정된 최대 벌림 폭 × 비율이 위 최대 굵기보다 작을 때 그 값을 상한으로 쓴다. " +
                  "손을 잘 펴지 못하는 아동을 위한 안전장치.")]
@@ -111,6 +117,10 @@ namespace SignBridge.HandSize
 
         /// <summary>원래 스케일에서의 가장 긴 축 길이(m).</summary>
         public float BaseLargestSize => _baseLargestSize;
+
+        /// <summary>가장 긴 축이 굵기의 No Grow Elongation 배 이상인 막대형 물체인지.</summary>
+        public bool IsElongated =>
+            _noGrowElongation > 0f && _baseGripSize > 0f && _baseLargestSize >= _baseGripSize * _noGrowElongation;
 
         public float CurrentMultiplier => _currentMultiplier;
         public float TargetMultiplier { get; private set; } = 1f;
@@ -197,6 +207,11 @@ namespace SignBridge.HandSize
                         // 너무 두꺼워 손에 잘 안 들어감 → 최대 굵기까지 줄인다.
                         m = maxGrip / _baseGripSize;
                         reason = $"너무 큼, {range}";
+                    }
+                    else if (_growWhenTooSmall && _baseGripSize < minGrip && IsElongated)
+                    {
+                        // 막대형: 감싸 쥐는 손잡이라 얇아도 잘 잡힌다. 키우면 길이만 지나치게 길어진다.
+                        reason = $"막대형이라 키우지 않음 (길이/굵기 {_baseLargestSize / _baseGripSize:F1}배), {range}";
                     }
                     else if (_growWhenTooSmall && _baseGripSize < minGrip)
                     {
