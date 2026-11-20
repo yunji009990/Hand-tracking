@@ -802,18 +802,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _mode: 1
-  _strength: 1
   _gripAxis: 0
   _gripSizeOverride: 0
-  _minGripRatio: 0.08
-  _maxGripRatio: 0.4
+  _comfortMaxRatio: 0.36
+  _comfortMinRatio: 0.25
+  _growWhenTooSmall: 1
+  _maxGrowMultiplier: 1.5
   _useMeasuredAperture: 1
   _apertureFitRatio: 0.8
-  _allowGrow: 0
+  _strength: 1
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
   _grabbable: {fileID: 0}
+  _logChanges: 1
 --- !u!1 &1022093626 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -7173736321389944737, guid: bd535771f7ccbf64193295bdd2ea140d, type: 3}
@@ -907,18 +909,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _mode: 1
-  _strength: 1
   _gripAxis: 0
   _gripSizeOverride: 0
-  _minGripRatio: 0.08
-  _maxGripRatio: 0.4
+  _comfortMaxRatio: 0.36
+  _comfortMinRatio: 0.25
+  _growWhenTooSmall: 1
+  _maxGrowMultiplier: 1.5
   _useMeasuredAperture: 1
   _apertureFitRatio: 0.8
-  _allowGrow: 0
+  _strength: 1
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
   _grabbable: {fileID: 0}
+  _logChanges: 1
 --- !u!1 &1023053335 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 0d288302865e98e4d8648aa4e5900ca9, type: 3}
@@ -1012,18 +1016,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _mode: 1
-  _strength: 1
   _gripAxis: 0
   _gripSizeOverride: 0
-  _minGripRatio: 0.08
-  _maxGripRatio: 0.4
+  _comfortMaxRatio: 0.36
+  _comfortMinRatio: 0.25
+  _growWhenTooSmall: 1
+  _maxGrowMultiplier: 1.5
   _useMeasuredAperture: 1
   _apertureFitRatio: 0.8
-  _allowGrow: 0
+  _strength: 1
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
   _grabbable: {fileID: 0}
+  _logChanges: 1
 --- !u!1 &1101089673
 GameObject:
   m_ObjectHideFlags: 0
@@ -1377,18 +1383,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _mode: 1
-  _strength: 1
   _gripAxis: 0
   _gripSizeOverride: 0
-  _minGripRatio: 0.08
-  _maxGripRatio: 0.4
+  _comfortMaxRatio: 0.36
+  _comfortMinRatio: 0.25
+  _growWhenTooSmall: 1
+  _maxGrowMultiplier: 1.5
   _useMeasuredAperture: 1
   _apertureFitRatio: 0.8
-  _allowGrow: 0
+  _strength: 1
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
   _grabbable: {fileID: 0}
+  _logChanges: 1
 --- !u!1 &1172857687
 GameObject:
   m_ObjectHideFlags: 0
@@ -1420,7 +1428,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _hands: []
   _referenceHandLength: 0.185
-  _validLengthRange: {x: 0.11, y: 0.17}
+  _validLengthRange: {x: 0.1, y: 0.23}
   _usePriorBeforeMeasurement: 1
   _priorHandLength: 0.138
   _priorApertureRatio: 0.7
@@ -1569,18 +1577,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _mode: 1
-  _strength: 1
   _gripAxis: 0
   _gripSizeOverride: 0
-  _minGripRatio: 0.08
-  _maxGripRatio: 0.4
+  _comfortMaxRatio: 0.36
+  _comfortMinRatio: 0.25
+  _growWhenTooSmall: 1
+  _maxGrowMultiplier: 1.5
   _useMeasuredAperture: 1
   _apertureFitRatio: 0.8
-  _allowGrow: 0
+  _strength: 1
   _multiplierLimits: {x: 0.5, y: 2}
   _transitionTime: 0.25
   _scaleMass: 0
   _grabbable: {fileID: 0}
+  _logChanges: 1
 --- !u!1 &1740064165
 GameObject:
   m_ObjectHideFlags: 0

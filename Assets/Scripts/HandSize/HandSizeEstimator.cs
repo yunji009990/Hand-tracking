@@ -35,9 +35,10 @@ namespace SignBridge.HandSize
         private float _referenceHandLength = 0.185f;
 
         [Tooltip("이 범위를 벗어나는 손 길이 측정값은 트래킹 오류로 보고 버린다(m). " +
-                 "기본값은 5~7세 아동 평균 ±3 표준편차(약 11~17cm). 성인 손으로 테스트하려면 넓힐 것.")]
+                 "하한 10cm는 5~7세 아동 평균 -3 표준편차(약 11cm)보다 조금 아래, " +
+                 "상한 23cm는 성인 남성 최대(약 22cm)보다 조금 위. 아동과 성인 테스터 모두 측정된다.")]
         [SerializeField]
-        private Vector2 _validLengthRange = new Vector2(0.11f, 0.17f);
+        private Vector2 _validLengthRange = new Vector2(0.10f, 0.23f);
 
         [Header("아동 기준 (5~7세, 측정 전 초기 추정값)")]
         [Tooltip("켜면 실제 데이터가 쌓이기 전에도 아동 평균 손 크기로 물체를 미리 맞춘다.")]
@@ -307,7 +308,7 @@ namespace SignBridge.HandSize
             Debug.LogWarning(
                 $"[HandSize] 손 길이 {_lastRejectedLength * 100f:F1}cm가 허용 범위 " +
                 $"({_validLengthRange.x * 100f:F0}~{_validLengthRange.y * 100f:F0}cm)를 벗어나 계속 버려지고 있습니다. " +
-                "성인 손으로 테스트 중이라면 Valid Length Range를 넓히세요.", this);
+                "트래킹이 불안정하거나 범위 설정이 좁을 수 있습니다. Valid Length Range를 확인하세요.", this);
         }
 
         private static bool TryMeasure(IHand hand, out Sample sample)

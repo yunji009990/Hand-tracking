@@ -5,18 +5,26 @@ namespace SignBridge.HandSize
 {
     /// <summary>
     /// 잡을 수 있는 오브젝트(Grabbable 루트)에 붙인다.
-    /// HandSizeEstimator가 측정한 손 크기에 맞춰 오브젝트 크기를 부드럽게 조정한다.
+    /// HandSizeEstimator가 측정한 플레이어 손 크기를 기준으로, 원래 스케일로는 잡기 어려운 물체만 조정한다.
+    ///
+    /// 잡는 굵기(가장 얇은 축)를 "편하게 쥐는 굵기" 범위(측정된 손 길이 × 0.25~0.36)와 비교한다.
+    /// - 범위보다 두꺼우면 줄인다. (예: 성인 18cm 손에서 10cm 박스 → 6.5cm)
+    /// - 범위보다 얇으면 키운다(최대 1.5배). (예: 성인 18cm 손에서 3.7cm 컵 → 4.5cm)
+    /// - 범위 안이면 그대로 둔다. (예: 5.6cm 식빵)
+    ///
+    /// 기준이 측정된 손 길이의 비율이라, 아동이든 성인 테스터든 그 손에 맞춰 판단한다.
     /// 잡고 있는 동안에는 크기를 바꾸지 않고, 놓은 뒤에 적용한다.
     /// </summary>
     [DisallowMultipleComponent]
     public class GraspSizeAdapter : MonoBehaviour
     {
+        // 씬에 정수로 저장되므로 순서를 바꾸지 말 것. (0 = ProportionalToHand, 1 = FitGripToHand)
         public enum SizingMode
         {
-            [Tooltip("손 크기 비율만큼 그대로 키우거나 줄인다. (성인 기준으로 만든 오브젝트를 아동 손에 맞출 때)")]
-            ProportionalToHand,
-            [Tooltip("잡는 부분의 굵기가 손 길이 대비 허용 범위를 벗어날 때만 범위 안으로 맞춘다.")]
-            FitGripToHand,
+            [Tooltip("손 크기 비율(측정 손 / 기준 손)만큼 그대로 키우거나 줄인다.")]
+            ProportionalToHand = 0,
+            [Tooltip("잡기 어려울 만큼 크거나 작을 때만 조정한다. (권장)")]
+            FitGripToHand = 1,
         }
 
         public enum GripAxis { AutoSmallest, X, Y, Z }
@@ -24,12 +32,7 @@ namespace SignBridge.HandSize
         [SerializeField]
         private SizingMode _mode = SizingMode.FitGripToHand;
 
-        [Header("ProportionalToHand")]
-        [Tooltip("1이면 손 크기 비율 그대로, 0이면 조정하지 않음.")]
-        [SerializeField, Range(0f, 1f)]
-        private float _strength = 1f;
-
-        [Header("FitGripToHand")]
+        [Header("잡는 굵기")]
         [Tooltip("잡는 부분의 굵기를 잴 축(루트 로컬 기준). Auto는 가장 얇은 축.")]
         [SerializeField]
         private GripAxis _gripAxis = GripAxis.AutoSmallest;
@@ -38,28 +41,40 @@ namespace SignBridge.HandSize
         [SerializeField, Min(0f)]
         private float _gripSizeOverride = 0f;
 
-        [Tooltip("잡는 굵기의 최소값 = 손 길이 × 이 비율. 너무 작아서 못 집는 것을 방지. (Allow Grow가 켜져 있을 때만 적용)")]
-        [SerializeField, Range(0.02f, 0.5f)]
-        private float _minGripRatio = 0.08f;
+        [Header("편하게 쥐는 굵기 = 측정된 손 길이 × 비율")]
+        [Tooltip("이보다 두꺼우면 줄인다. 0.36 → 성인 18cm 손이면 6.5cm, 아동 13.8cm 손이면 5.0cm.")]
+        [SerializeField, Range(0.1f, 0.8f)]
+        private float _comfortMaxRatio = 0.36f;
 
-        [Tooltip("벌림 폭 데이터가 아직 쌓이지 않았을 때 쓰는 최대 굵기 = 손 길이 × 이 비율.")]
-        [SerializeField, Range(0.05f, 1f)]
-        private float _maxGripRatio = 0.4f;
+        [Tooltip("이보다 얇으면 키운다. 0.25 → 성인 18cm 손이면 4.5cm, 아동 13.8cm 손이면 3.5cm.")]
+        [SerializeField, Range(0.05f, 0.6f)]
+        private float _comfortMinRatio = 0.25f;
 
-        [Tooltip("켜면, 쌓인 손 데이터의 최대 벌림 폭(엄지~검지/중지 끝)을 기준으로 최대 굵기를 정한다.")]
+        [Tooltip("켜면, 너무 얇아 집기 어려운 물체를 키운다.")]
+        [SerializeField]
+        private bool _growWhenTooSmall = true;
+
+        [Tooltip("키울 때의 최대 배율. 너무 많이 커지는 것을 막는다.")]
+        [SerializeField, Range(1f, 3f)]
+        private float _maxGrowMultiplier = 1.5f;
+
+        [Header("벌림 폭 상한 (보조)")]
+        [Tooltip("켜면, 측정된 최대 벌림 폭 × 비율이 위 최대 굵기보다 작을 때 그 값을 상한으로 쓴다. " +
+                 "손을 잘 펴지 못하는 아동을 위한 안전장치.")]
         [SerializeField]
         private bool _useMeasuredAperture = true;
 
-        [Tooltip("최대 굵기 = 측정된 최대 벌림 폭 × 이 비율. 1이면 손을 끝까지 벌려야 겨우 잡히는 크기.")]
+        [Tooltip("벌림 폭 상한 = 측정된 최대 벌림 폭 × 이 비율.")]
         [SerializeField, Range(0.3f, 1.2f)]
         private float _apertureFitRatio = 0.8f;
 
-        [Header("공통")]
-        [Tooltip("끄면 줄이기만 하고 원래 크기보다 키우지 않는다. 원래 크기에서 잘 잡히는 물체는 그대로 둔다.")]
-        [SerializeField]
-        private bool _allowGrow = false;
+        [Header("ProportionalToHand")]
+        [Tooltip("1이면 손 크기 비율 그대로, 0이면 조정하지 않음.")]
+        [SerializeField, Range(0f, 1f)]
+        private float _strength = 1f;
 
-        [Tooltip("원래 크기 대비 배율의 최소/최대 한계. (Allow Grow가 꺼져 있으면 최대는 1로 고정)")]
+        [Header("공통")]
+        [Tooltip("원래 크기 대비 배율의 최소/최대 한계.")]
         [SerializeField]
         private Vector2 _multiplierLimits = new Vector2(0.5f, 2f);
 
@@ -75,14 +90,28 @@ namespace SignBridge.HandSize
         [SerializeField]
         private PointableElement _grabbable;
 
+        [Tooltip("목표 배율이 바뀔 때 콘솔에 이유를 남긴다.")]
+        [SerializeField]
+        private bool _logChanges = true;
+
         private Vector3 _baseScale;
         private float _baseMass;
         private float _baseGripSize;
+        private float _baseLargestSize;
         private Rigidbody _rigidbody;
         private float _currentMultiplier = 1f;
         private bool _initialized;
+        private bool _loggedOnce;
+        private bool _wasGrabbed;
+        private readonly System.Collections.Generic.List<MonoBehaviour> _components =
+            new System.Collections.Generic.List<MonoBehaviour>();
 
+        /// <summary>원래 스케일에서의 잡는 굵기(m).</summary>
         public float BaseGripSize => _baseGripSize;
+
+        /// <summary>원래 스케일에서의 가장 긴 축 길이(m).</summary>
+        public float BaseLargestSize => _baseLargestSize;
+
         public float CurrentMultiplier => _currentMultiplier;
         public float TargetMultiplier { get; private set; } = 1f;
 
@@ -92,7 +121,10 @@ namespace SignBridge.HandSize
             _rigidbody = GetComponent<Rigidbody>();
             _baseScale = transform.localScale;
             if (_rigidbody != null) _baseMass = _rigidbody.mass;
-            _baseGripSize = _gripSizeOverride > 0f ? _gripSizeOverride : MeasureGripSize();
+
+            Vector3 size = MeasureSize();
+            _baseLargestSize = Mathf.Max(size.x, Mathf.Max(size.y, size.z));
+            _baseGripSize = _gripSizeOverride > 0f ? _gripSizeOverride : SelectGripAxis(size);
             _initialized = true;
         }
 
@@ -101,9 +133,23 @@ namespace SignBridge.HandSize
             HandSizeEstimator estimator = HandSizeEstimator.Instance;
             if (estimator == null || !estimator.IsCalibrated) return;
 
-            TargetMultiplier = ComputeMultiplier(estimator);
+            float target = ComputeMultiplier(estimator, out string reason);
+            if (_logChanges && (!_loggedOnce || Mathf.Abs(target - TargetMultiplier) > 0.01f))
+            {
+                Debug.Log($"[HandSize] {name}: 굵기 {_baseGripSize * 100f:F1}cm, 길이 {_baseLargestSize * 100f:F1}cm " +
+                          $"→ {target:F2}배 ({reason})", this);
+            }
+            _loggedOnce = true;
+            TargetMultiplier = target;
 
-            if (IsGrabbed()) return;
+            bool grabbed = IsGrabbed();
+            if (grabbed) { _wasGrabbed = true; return; }
+            if (_wasGrabbed)
+            {
+                // 놓은 직후: 잡는 동안 다른 코드가 크기를 되돌렸다면 다시 맞춘다.
+                _wasGrabbed = false;
+                if ((transform.localScale - _baseScale * _currentMultiplier).sqrMagnitude > 1e-10f) Apply();
+            }
             if (Mathf.Approximately(_currentMultiplier, TargetMultiplier)) return;
 
             if (_transitionTime <= 0f)
@@ -118,28 +164,53 @@ namespace SignBridge.HandSize
             Apply();
         }
 
-        private float ComputeMultiplier(HandSizeEstimator estimator)
+        private float ComputeMultiplier(HandSizeEstimator estimator, out string reason)
         {
+            // 편하게 쥐는 굵기 범위. 손 길이는 측정이 안정적이라 주 기준으로 쓰고,
+            // 벌림 폭은 그보다 작을 때만 상한으로 쓴다(값이 흔들려도 대부분 영향 없음).
+            float maxGrip = estimator.HandLength * _comfortMaxRatio;
+            if (_useMeasuredAperture && estimator.HasGripAperture)
+            {
+                maxGrip = Mathf.Min(maxGrip, estimator.MaxGripAperture * _apertureFitRatio);
+            }
+            float minGrip = Mathf.Min(estimator.HandLength * _comfortMinRatio, maxGrip);
+            string range = $"편한 굵기 {minGrip * 100f:F1}~{maxGrip * 100f:F1}cm";
+
             float m = 1f;
+            reason = $"잘 잡히는 크기, {range}";
             switch (_mode)
             {
-                case SizingMode.ProportionalToHand:
-                    m = Mathf.Lerp(1f, estimator.HandScale, _strength);
+                case SizingMode.FitGripToHand:
+                    if (_baseGripSize <= 0f) { reason = "크기를 잴 수 없음"; break; }
+
+                    if (_baseGripSize > maxGrip)
+                    {
+                        // 너무 두꺼워 손에 잘 안 들어감 → 최대 굵기까지 줄인다.
+                        m = maxGrip / _baseGripSize;
+                        reason = $"너무 큼, {range}";
+                    }
+                    else if (_growWhenTooSmall && _baseGripSize < minGrip)
+                    {
+                        // 너무 얇아 집기 어려움 → 최소 굵기까지 키운다.
+                        m = minGrip / _baseGripSize;
+                        reason = $"너무 작음, {range}";
+                    }
                     break;
 
-                case SizingMode.FitGripToHand:
-                    if (_baseGripSize <= 0f) break;
-                    float min = estimator.HandLength * _minGripRatio;
-                    float max = _useMeasuredAperture && estimator.HasGripAperture
-                        ? estimator.MaxGripAperture * _apertureFitRatio
-                        : estimator.HandLength * _maxGripRatio;
-                    max = Mathf.Max(max, min);
-                    if (_baseGripSize < min) m = min / _baseGripSize;
-                    else if (_baseGripSize > max) m = max / _baseGripSize;
+                case SizingMode.ProportionalToHand:
+                    m = Mathf.Lerp(1f, estimator.HandScale, _strength);
+                    if (m > 1f && !_growWhenTooSmall) m = 1f;
+                    reason = $"손 비율 {estimator.HandScale:F2}";
                     break;
             }
-            float maxMultiplier = _allowGrow ? _multiplierLimits.y : Mathf.Min(1f, _multiplierLimits.y);
-            return Mathf.Clamp(m, Mathf.Min(_multiplierLimits.x, maxMultiplier), maxMultiplier);
+
+            if (m > 1f)
+            {
+                m = Mathf.Min(m, _maxGrowMultiplier);
+                // 키운 결과가 손에 안 들어갈 만큼 두꺼워지면 안 된다.
+                if (_baseGripSize > 0f) m = Mathf.Min(m, Mathf.Max(1f, maxGrip / _baseGripSize));
+            }
+            return Mathf.Clamp(m, _multiplierLimits.x, _multiplierLimits.y);
         }
 
         private void Apply()
@@ -149,14 +220,43 @@ namespace SignBridge.HandSize
             {
                 _rigidbody.mass = _baseMass * _currentMultiplier * _currentMultiplier * _currentMultiplier;
             }
+            RefreshGrabTransformers();
+        }
+
+        /// <summary>
+        /// Grabbable의 Transformer(GrabFreeTransformer 등)는 시작할 때의 크기를 기억해 두고,
+        /// 잡는 동안 그 크기로 강제로 되돌린다(기본 스케일 제한 = 원래 크기 × 1).
+        /// 크기를 바꿀 때마다 다시 Initialize해서 새 크기를 기준으로 삼게 한다.
+        /// </summary>
+        private void RefreshGrabTransformers()
+        {
+            if (!(_grabbable is IGrabbable grabbable)) return;
+
+            _components.Clear();
+            _grabbable.GetComponents(_components);
+            foreach (MonoBehaviour mb in _components)
+            {
+                if (mb is ITransformer transformer) transformer.Initialize(grabbable);
+            }
         }
 
         private bool IsGrabbed() => _grabbable != null && _grabbable.SelectingPointsCount > 0;
 
+        private float SelectGripAxis(Vector3 size)
+        {
+            switch (_gripAxis)
+            {
+                case GripAxis.X: return size.x;
+                case GripAxis.Y: return size.y;
+                case GripAxis.Z: return size.z;
+                default: return Mathf.Min(size.x, Mathf.Min(size.y, size.z));
+            }
+        }
+
         /// <summary>
-        /// 자식 메시의 범위를 루트 로컬 축 기준으로 합쳐 실제(월드) 크기로 바꾼 뒤 잡는 축의 길이를 돌려준다.
+        /// 자식 메시의 범위를 루트 로컬 축 기준으로 합쳐 실제(월드) 크기로 돌려준다.
         /// </summary>
-        private float MeasureGripSize()
+        private Vector3 MeasureSize()
         {
             Matrix4x4 worldToRoot = transform.worldToLocalMatrix;
             bool hasBounds = false;
@@ -176,21 +276,13 @@ namespace SignBridge.HandSize
                 foreach (Collider c in GetComponentsInChildren<Collider>())
                 {
                     if (c.isTrigger) continue;
-                    Bounds b = c.bounds;
-                    Encapsulate(ref local, ref hasBounds, worldToRoot, b);
+                    Encapsulate(ref local, ref hasBounds, worldToRoot, c.bounds);
                 }
             }
-            if (!hasBounds) return 0f;
+            if (!hasBounds) return Vector3.zero;
 
             Vector3 lossy = transform.lossyScale;
-            Vector3 size = Vector3.Scale(local.size, new Vector3(Mathf.Abs(lossy.x), Mathf.Abs(lossy.y), Mathf.Abs(lossy.z)));
-            switch (_gripAxis)
-            {
-                case GripAxis.X: return size.x;
-                case GripAxis.Y: return size.y;
-                case GripAxis.Z: return size.z;
-                default: return Mathf.Min(size.x, Mathf.Min(size.y, size.z));
-            }
+            return Vector3.Scale(local.size, new Vector3(Mathf.Abs(lossy.x), Mathf.Abs(lossy.y), Mathf.Abs(lossy.z)));
         }
 
         private static void Encapsulate(ref Bounds target, ref bool has, Matrix4x4 m, Bounds b)
@@ -215,7 +307,6 @@ namespace SignBridge.HandSize
 
         private void OnValidate()
         {
-            if (_maxGripRatio < _minGripRatio) _maxGripRatio = _minGripRatio;
             if (_multiplierLimits.y < _multiplierLimits.x) _multiplierLimits.y = _multiplierLimits.x;
         }
     }
