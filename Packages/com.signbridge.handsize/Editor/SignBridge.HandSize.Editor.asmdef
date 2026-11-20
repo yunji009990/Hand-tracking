@@ -1,0 +1,19 @@
+{
+    "name": "SignBridge.HandSize.Editor",
+    "rootNamespace": "SignBridge.HandSize.Editor",
+    "references": [
+        "SignBridge.HandSize",
+        "Oculus.Interaction"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

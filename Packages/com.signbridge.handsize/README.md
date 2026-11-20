@@ -1,8 +1,83 @@
-# Hand Size 모듈
+# SignBridge Hand Size (`com.signbridge.handsize`)
 
 플레이어가 손을 움직이는 동안 손 데이터를 계속 쌓아서, 잡을 수 있는 물체가 그 손에 맞는 크기가 되도록 자동으로 조정합니다.
 
-## 구성
+- 측정 전에는 5~7세 아동 평균 손 크기로 시작하고, 측정이 되면 실제 플레이어(아동 또는 성인 테스터)의 손에 맞춥니다.
+- 너무 두꺼운 물체는 줄이고, 너무 얇은 물체는 키우고, 편하게 쥐어지는 물체는 그대로 둡니다.
+- 잡고 있는 동안에는 크기를 바꾸지 않고, 잡아도 바뀐 크기가 유지됩니다.
+
+## 요구 사항
+
+| 항목 | 버전 |
+|---|---|
+| Unity | 2022.3 이상 |
+| Meta XR Interaction SDK (`com.meta.xr.sdk.interaction`) | 77.0.0 이상 |
+| 손 인터랙션 | 씬에 Meta Interaction SDK의 `Hand` 컴포넌트가 있는 리그 (예: `OVRInteraction` / `OVRHands`) |
+| 잡기 | 물체에 `Grabbable` + Hand Grab(Touch / Hand / Distance) |
+
+OpenXR 손(`ISDK_OPENXR_HAND`)과 기존 OVR 손 모두 지원합니다.
+
+## 설치
+
+### 방법 1. Git URL (권장)
+
+1. **Window > Package Manager**를 엽니다.
+2. 왼쪽 위 **+**를 누르고 **Add package from git URL...**을 고릅니다.
+3. 아래 주소를 넣습니다.
+   ```
+   https://github.com/yunji009990/Hand-tracking.git?path=Packages/com.signbridge.handsize
+   ```
+   특정 버전에 고정하려면 끝에 `#커밋해시`나 `#태그`를 붙입니다.
+
+`Packages/manifest.json`에 직접 넣어도 됩니다.
+```json
+"com.signbridge.handsize": "https://github.com/yunji009990/Hand-tracking.git?path=Packages/com.signbridge.handsize"
+```
+
+### 방법 2. 폴더 복사
+
+이 폴더(`com.signbridge.handsize`)를 통째로 다른 프로젝트의 `Packages/` 폴더에 복사합니다. 복사한 프로젝트 안에서 코드를 고쳐 쓸 수 있습니다.
+
+## 빠른 시작
+
+1. 패키지를 설치합니다.
+2. 씬에 `HandSizeEstimator`를 하나 둡니다. 빈 GameObject에 붙이거나, **Tools > SignBridge > Hand Size > 씬 자동 설정**을 누르면 됩니다.
+3. Play합니다. 끝입니다.
+   - Estimator의 **Auto Attach Adapters**(기본 켜짐) 덕분에, 손으로 잡을 수 있는(Hand Grab이 있는) 모든 `Grabbable`에 `GraspSizeAdapter`가 실행 중에 자동으로 붙습니다.
+   - 실행 중에 생성(Instantiate)되는 물체도 1초마다 찾아서 붙입니다.
+   - 콘솔의 `[HandSize]` 로그에서 측정된 손 크기와 물체마다 정한 배율을 확인할 수 있습니다.
+4. 헤드셋이 없으면 `HandSizeEstimator`의 **Editor Simulated Hand Length**에 손 길이(m)를 넣고 테스트합니다. 끝나면 꼭 0으로 되돌리세요.
+
+### 어떤 물체에 적용되나요?
+
+| 물체 | 적용 |
+|---|---|
+| `Grabbable` + Hand Grab(Touch / Hand / Distance)이 있는 물체 | ✅ 자동 적용 |
+| 실행 중에 생성된 위와 같은 물체 | ✅ 1초 안에 자동 적용 (`Auto Attach Scan Interval`) |
+| `Grabbable`만 있고 Hand Grab이 없는 물체 (예: 테이블) | ❌ 건너뜀 |
+| 이미 `GraspSizeAdapter`가 붙어 있는 물체 | 그 Adapter의 설정을 그대로 씀 |
+| **특정 물체를 빼고 싶을 때** | 그 물체에 `GraspSizeAdapter`를 붙이고 **체크를 꺼 두면** 자동 연결이 건너뜁니다 |
+
+- 물체마다 설정(편한 굵기 비율 등)을 다르게 하려면, 에디터에서 미리 Adapter를 붙여 두고 값을 바꾸면 됩니다. 메뉴의 **씬 자동 설정**이나 **선택한 오브젝트에 GraspSizeAdapter 추가**를 쓰면 됩니다.
+- 자동 연결을 끄려면 Estimator의 **Auto Attach Adapters**를 끕니다. 그러면 Adapter를 미리 붙인 물체만 조정됩니다.
+- 코드에서 바로 연결하려면 `HandSizeEstimator.Instance.AttachAdaptersInScene()`을 부릅니다.
+
+## 폴더 구성
+
+```
+com.signbridge.handsize/
+├── package.json
+├── README.md
+├── CHANGELOG.md
+├── Runtime/                    (SignBridge.HandSize 어셈블리)
+│   ├── HandSizeEstimator.cs    손 측정과 데이터 누적
+│   └── GraspSizeAdapter.cs     물체 크기 조정
+└── Editor/                     (SignBridge.HandSize.Editor 어셈블리)
+    ├── HandSizeSetupMenu.cs                Tools > SignBridge > Hand Size 메뉴
+    └── MissingInteractionReferenceFinder.cs  Tools > SignBridge > Diagnostics 메뉴
+```
+
+## 동작 원리
 
 | 스크립트 | 붙이는 곳 | 역할 |
 |---|---|---|
@@ -42,7 +117,7 @@
   - 시작 직후 잠깐(손 데이터 20개, 1초 미만)은 아동 평균값으로 시작하므로 물체가 살짝 줄었다가, 측정이 되면 성인 손에 맞게 돌아올 수 있습니다.
 - 한국 아동 데이터로 바꾸려면 [사이즈코리아](https://sizekorea.kr)(회원가입 필요)의 6차 조사(2010, 7세 이상)나 5차 조사(2003~2004, 0~90세) 보고서에서 손 길이를 찾아 `Prior Hand Length`에 넣으면 됩니다.
 
-## 설정 방법
+## 메뉴
 
 1. **Tools > SignBridge > Hand Size > 씬 자동 설정**을 실행합니다.
    - 씬에 `HandSizeEstimator`가 없으면 하나 만듭니다.
@@ -81,7 +156,7 @@
 - `Comfort Max Ratio`(0.36), `Comfort Min Ratio`(0.25): 편하게 쥐는 굵기의 범위입니다.
 - `Grow When Too Small`: 끄면 키우지 않습니다.
 - `Max Grow Multiplier`(1.5): 최대로 키울 수 있는 배율입니다.
-- `Multiplier Limits`(기본 0.5~2배): 원래 크기 대비 배율의 한계입니다.
+- `Scale Limits`(기본 0.1~2배): 원래 크기 대비 배율의 한계입니다. 하한이 낮은 이유는 아주 크게 놓인 물체(예: 20cm 박스)도 편한 굵기까지 줄일 수 있게 하기 위해서입니다.
 - `Log Changes`: 켜 두면 콘솔에 `[HandSize] 물체: 굵기 → 배율 (이유)` 로그가 남습니다.
 
 ## 헤드셋 없이 테스트

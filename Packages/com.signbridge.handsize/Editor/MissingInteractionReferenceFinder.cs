@@ -5,7 +5,7 @@ using Oculus.Interaction;
 using UnityEditor;
 using UnityEngine;
 
-namespace SignBridge.Diagnostics.Editor
+namespace SignBridge.HandSize.Editor
 {
     /// <summary>
     /// 씬에 있는 Meta Interaction SDK 컴포넌트 중 필수 참조([Interface] 필드인데 [Optional]이 아닌 것)가

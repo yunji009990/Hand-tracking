@@ -27,6 +27,14 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.signbridge.handsize": {
+      "version": "file:com.signbridge.handsize",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.meta.xr.sdk.interaction": "77.0.0"
+      }
+    },
     "com.unity.burst": {
       "version": "1.8.21",
       "depth": 1,

@@ -1,5 +1,4 @@
 using Oculus.Interaction;
-using Oculus.Interaction.HandGrab;
 using UnityEditor;
 using UnityEngine;
 
@@ -23,18 +22,13 @@ namespace SignBridge.HandSize.Editor
             {
                 if (g.GetComponent<GraspSizeAdapter>() != null) continue;
                 // 손으로 잡는 설정(Hand Grab)이 있는 오브젝트만 대상으로 한다. (테이블 등 제외)
-                if (!HasHandGrab(g.gameObject)) continue;
+                if (!GraspSizeAdapter.HasHandGrab(g.gameObject)) continue;
                 Undo.AddComponent<GraspSizeAdapter>(g.gameObject);
                 added++;
             }
 
             Debug.Log($"[HandSize] GraspSizeAdapter {added}개 추가 (Hand Grab이 있는 Grabbable만).");
         }
-
-        private static bool HasHandGrab(GameObject go) =>
-            go.GetComponentInChildren<TouchHandGrabInteractable>(true) != null ||
-            go.GetComponentInChildren<HandGrabInteractable>(true) != null ||
-            go.GetComponentInChildren<DistanceHandGrabInteractable>(true) != null;
 
         [MenuItem("Tools/SignBridge/Hand Size/선택한 오브젝트에 GraspSizeAdapter 추가")]
         private static void AddToSelection()

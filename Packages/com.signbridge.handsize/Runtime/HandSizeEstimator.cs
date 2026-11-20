@@ -88,6 +88,16 @@ namespace SignBridge.HandSize
         [SerializeField, Min(0f)]
         private float _resetAfterLostSeconds = 10f;
 
+        [Header("물체 자동 연결")]
+        [Tooltip("켜면, 손으로 잡을 수 있는(Hand Grab이 있는) 모든 Grabbable에 GraspSizeAdapter를 실행 중에 자동으로 붙인다. " +
+                 "이미 Adapter가 있는 물체는 그대로 둔다. 특정 물체를 빼려면 그 물체에 Adapter를 붙이고 꺼 두면 된다.")]
+        [SerializeField]
+        private bool _autoAttachAdapters = true;
+
+        [Tooltip("새로 생긴 물체(Instantiate 등)를 찾는 간격(초). 0이면 시작할 때 한 번만 찾는다.")]
+        [SerializeField, Min(0f)]
+        private float _autoAttachScanInterval = 1f;
+
         [Header("에디터 테스트 (헤드셋 없이 확인용)")]
         [Tooltip("0보다 크면 실제 측정 대신 이 손 길이(m)를 사용한다. 에디터에서만 적용.")]
         [SerializeField, Range(0f, 0.25f)]
@@ -158,6 +168,8 @@ namespace SignBridge.HandSize
         private bool _dirty;
         private float _lastSimulatedLength = -1f, _lastSimulatedAperture = -1f;
         private bool _apertureMeasured;
+        private readonly HashSet<int> _checkedGrabbables = new HashSet<int>();
+        private float _nextAttachScanTime;
         private int _rejectedInRow;
         private float _lastRejectedLength;
         private float _nextRejectWarningTime;
@@ -219,8 +231,42 @@ namespace SignBridge.HandSize
             }
         }
 
+        private void Start()
+        {
+            // 모든 오브젝트의 Awake가 끝난 뒤에 찾아야 씬의 물체를 빠짐없이 볼 수 있다.
+            if (_autoAttachAdapters) AttachAdaptersInScene(includeInactive: true);
+        }
+
+        /// <summary>
+        /// 손으로 잡을 수 있는 Grabbable 중 GraspSizeAdapter가 없는 것에 Adapter를 붙인다.
+        /// 한 번 검사한 Grabbable은 다시 검사하지 않는다.
+        /// </summary>
+        /// <returns>새로 붙인 개수</returns>
+        public int AttachAdaptersInScene(bool includeInactive = false)
+        {
+            int added = 0;
+            var inactive = includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude;
+            foreach (Grabbable grabbable in FindObjectsByType<Grabbable>(inactive, FindObjectsSortMode.None))
+            {
+                if (!_checkedGrabbables.Add(grabbable.GetInstanceID())) continue;
+                if (grabbable.GetComponent<GraspSizeAdapter>() != null) continue;
+                if (!GraspSizeAdapter.HasHandGrab(grabbable.gameObject)) continue;
+
+                grabbable.gameObject.AddComponent<GraspSizeAdapter>();
+                added++;
+                if (_logChanges) Debug.Log($"[HandSize] GraspSizeAdapter 자동 연결: {grabbable.name}", grabbable);
+            }
+            return added;
+        }
+
         private void Update()
         {
+            if (_autoAttachAdapters && _autoAttachScanInterval > 0f && Time.unscaledTime >= _nextAttachScanTime)
+            {
+                _nextAttachScanTime = Time.unscaledTime + _autoAttachScanInterval;
+                AttachAdaptersInScene();
+            }
+
 #if UNITY_EDITOR
             if (_editorSimulatedHandLength > 0f)
             {

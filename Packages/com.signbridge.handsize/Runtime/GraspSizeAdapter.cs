@@ -74,9 +74,9 @@ namespace SignBridge.HandSize
         private float _strength = 1f;
 
         [Header("공통")]
-        [Tooltip("원래 크기 대비 배율의 최소/최대 한계.")]
+        [Tooltip("원래 크기 대비 배율의 최소/최대 한계. 하한 0.1은 아주 크게 놓인 물체도 편한 굵기까지 줄이기 위한 값.")]
         [SerializeField]
-        private Vector2 _multiplierLimits = new Vector2(0.5f, 2f);
+        private Vector2 _scaleLimits = new Vector2(0.1f, 2f);
 
         [Tooltip("크기 변화에 걸리는 시간(초). 0이면 즉시.")]
         [SerializeField, Min(0f)]
@@ -114,6 +114,15 @@ namespace SignBridge.HandSize
 
         public float CurrentMultiplier => _currentMultiplier;
         public float TargetMultiplier { get; private set; } = 1f;
+
+        /// <summary>
+        /// 손으로 잡는 설정(Touch / Hand / Distance Hand Grab)이 자신이나 자식에 있는지.
+        /// 테이블처럼 Grabbable만 있고 손으로 잡지 않는 물체를 걸러낼 때 쓴다.
+        /// </summary>
+        public static bool HasHandGrab(GameObject go) =>
+            go.GetComponentInChildren<TouchHandGrabInteractable>(true) != null ||
+            go.GetComponentInChildren<Oculus.Interaction.HandGrab.HandGrabInteractable>(true) != null ||
+            go.GetComponentInChildren<Oculus.Interaction.HandGrab.DistanceHandGrabInteractable>(true) != null;
 
         private void Awake()
         {
@@ -210,7 +219,7 @@ namespace SignBridge.HandSize
                 // 키운 결과가 손에 안 들어갈 만큼 두꺼워지면 안 된다.
                 if (_baseGripSize > 0f) m = Mathf.Min(m, Mathf.Max(1f, maxGrip / _baseGripSize));
             }
-            return Mathf.Clamp(m, _multiplierLimits.x, _multiplierLimits.y);
+            return Mathf.Clamp(m, _scaleLimits.x, _scaleLimits.y);
         }
 
         private void Apply()
@@ -307,7 +316,7 @@ namespace SignBridge.HandSize
 
         private void OnValidate()
         {
-            if (_multiplierLimits.y < _multiplierLimits.x) _multiplierLimits.y = _multiplierLimits.x;
+            if (_scaleLimits.y < _scaleLimits.x) _scaleLimits.y = _scaleLimits.x;
         }
     }
 }
