@@ -1,6 +1,6 @@
 {
   "name": "com.signbridge.handsize",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "displayName": "SignBridge Hand Size",
   "description": "Measures the player's hand with Meta Interaction SDK hand tracking (hand length, palm width, grip aperture) and rescales grabbable objects that are too thick or too thin to grasp comfortably. Starts from a 5-7 year-old child prior and adapts to the measured hand, so it works for both children and adult testers.",
   "unity": "2022.3",

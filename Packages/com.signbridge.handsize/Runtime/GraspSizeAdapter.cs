@@ -64,6 +64,15 @@ namespace SignBridge.HandSize
         [SerializeField, Min(0f)]
         private float _noGrowElongation = 3f;
 
+        [Tooltip("막대형이라도 길이가 측정된 손 길이 × 이 비율보다 짧으면, 쥘 수 있게 이 길이까지 키운다. " +
+                 "0.7 → 성인 18cm 손이면 12.6cm, 아동 13.8cm 손이면 9.7cm. 0이면 끈다.")]
+        [SerializeField, Range(0f, 1.5f)]
+        private float _minStickLengthRatio = 0.7f;
+
+        [Tooltip("막대형을 길이 기준으로 키울 때의 최대 배율. Scale Limits의 최대값보다 우선한다.")]
+        [SerializeField, Range(1f, 5f)]
+        private float _maxStickGrowMultiplier = 3f;
+
         [Header("벌림 폭 상한 (보조)")]
         [Tooltip("켜면, 측정된 최대 벌림 폭 × 비율이 위 최대 굵기보다 작을 때 그 값을 상한으로 쓴다. " +
                  "손을 잘 펴지 못하는 아동을 위한 안전장치.")]
@@ -208,10 +217,23 @@ namespace SignBridge.HandSize
                         m = maxGrip / _baseGripSize;
                         reason = $"너무 큼, {range}";
                     }
-                    else if (_growWhenTooSmall && _baseGripSize < minGrip && IsElongated)
+                    else if (_growWhenTooSmall && IsElongated)
                     {
-                        // 막대형: 감싸 쥐는 손잡이라 얇아도 잘 잡힌다. 키우면 길이만 지나치게 길어진다.
-                        reason = $"막대형이라 키우지 않음 (길이/굵기 {_baseLargestSize / _baseGripSize:F1}배), {range}";
+                        // 막대형: 감싸 쥐는 손잡이라 얇아도 잘 잡힌다. 굵기 대신 길이로 판단한다.
+                        float minLength = estimator.HandLength * _minStickLengthRatio;
+                        if (_minStickLengthRatio > 0f && _baseLargestSize < minLength)
+                        {
+                            // 너무 짧아 쥘 수 없음 → 쥘 수 있는 길이까지 키운다(두께는 편한 굵기를 넘지 않게).
+                            m = Mathf.Min(minLength / _baseLargestSize, _maxStickGrowMultiplier,
+                                          Mathf.Max(1f, maxGrip / _baseGripSize));
+                            reason = $"막대형인데 너무 짧음, 쥘 수 있는 길이 {minLength * 100f:F1}cm 이상, {range}";
+                            // 1.5배 제한(Max Grow Multiplier) 대신 막대형 전용 제한을 쓴다.
+                            return Mathf.Clamp(m, _scaleLimits.x, Mathf.Max(_scaleLimits.y, _maxStickGrowMultiplier));
+                        }
+                        if (_baseGripSize < minGrip)
+                        {
+                            reason = $"막대형이라 굵기로 키우지 않음 (길이/굵기 {_baseLargestSize / _baseGripSize:F1}배), {range}";
+                        }
                     }
                     else if (_growWhenTooSmall && _baseGripSize < minGrip)
                     {
